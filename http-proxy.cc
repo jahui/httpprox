@@ -206,15 +206,25 @@ int main (int argc, char *argv[])
           //child can stop listening for new connections
           close(listen_sock);
 
+          /* Loop forever:
+               recv() from peer, put result onto the end of buffer b.
 
-          // TODO:
-          // 1. Parse http request from peer
-          // 2. Check cache for the resource
-          // 3. If resource is not in cache or it expired, send query to correct server.
-          // 4. Parse response from server
-          // 5. If it should be cached, then cache it
-          // 6. Send response to peer
+               if recv() returns 0: (i.e. the connection has been closed)
+                 subtract 1 from num_connections (it needs to do this thread safe)
+                 thread should exit
 
+               if newly recv()d stuff in b contains '\r\n\r\n' (two carriage returns in a row) then:
+                 split b into two parts (before the '\r\n\r\n' and after the '\r\n\r\n':
+                 the first part is parsed by HttpRequest, 
+                 check the cache for the parsed url, 
+                 if it's in the cache, then send() the data to the user
+                 else:
+                   the HttpRequest is given to the function getResponse()
+                   the result of getResponse() is parsed by a HttpResponse()
+                   the HttpResponse is given to the cache to be added
+                   the HttpResponse is formatted and sent to the user using send()
+                 the second part becomes the new buffer b.
+          */
 
           close(peer_sock);
           exit(EXIT_SUCCESS);
