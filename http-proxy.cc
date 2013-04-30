@@ -9,12 +9,15 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <netdb.h>
+#include <string>
+#include <stdio.h>
 #include "http-request.h"
 
 using namespace std;
 
 const int LISTEN_PORT = 14805;
 const int MAX_CONNECTIONS = 10;
+const int BUFFER_SIZE = 512;
 
 //TODO: for Sherri
 //uses recv() on the given port to obtain
@@ -23,7 +26,31 @@ const int MAX_CONNECTIONS = 10;
 //the request is over (i.e. two '\r\n's in a row)
 //SHERRI testing git
 //Sherri testing git
-string getRequest(int port);
+string getRequest(int port)
+{
+  char buffer[BUFFER_SIZE]; // buffer
+  string request = ""; // request string
+  ssize_t recv_len; // recv return value
+  size_t end;
+  // get the request from port
+  while(0 < (recv_len = recv(port, buffer, BUFFER_SIZE, 0)))
+  {
+    request.append(buffer, recv_len);
+    //look for the end
+    if(std::string::npos != (end = request.find("\r\n\r\\n")))
+      break;
+  }
+  if(0 == recv_len)
+    cout << "Port: " << port << " shut down (getRequest)" << endl;
+  if(0 > recv_len)
+    perror("Error occurred in getRequest");
+    
+  request = request.substr(0, (end + 4));
+  
+  return request;
+}
+    
+  
 
 //TODO: for Jonathan
 //Given an HttpRequest object, contacts the
