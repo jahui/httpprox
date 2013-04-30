@@ -21,6 +21,8 @@ const int MAX_CONNECTIONS = 10;
 //the text of the request, returns a string
 //containing the request. Should return when
 //the request is over (i.e. two '\r\n's in a row)
+//SHERRI testing git
+//Sherri testing git
 string getRequest(int port);
 
 //TODO: for Jonathan
