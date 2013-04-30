@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <netdb.h>
+#include "http-request.h"
 
 using namespace std;
 
@@ -32,31 +33,50 @@ string getRequest(int port);
 string getResponse(HttpRequest* req){
 
   // format the request
-  size_t reqLen = req.GetTotalLength();
-  char* request = new char[reqLen];
-  req.FormatRequest(request);
+  size_t reqLen = req->GetTotalLength();
+  char* req_buffer = new char[reqLen];
+  req->FormatRequest(req_buffer);
 
   // get the server ip
-  string* hostname = req.GetHost(); // get the host name
-  struct hostent* host = gethostbyname(hostname->c_str()); // get host struct
+  //const string hostname = req->GetHost(); // get the host name
+  struct hostent* host = gethostbyname((req->GetHost()).c_str()); // get host struct
 
   // create the socket
-  int socket = socket(AF_INET, SOCK_STREAM, 0);
+  int server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
   // create the address
   struct sockaddr_in server_address;
-  server_address.sa_family = AF_INET;
+  server_address.sin_family = AF_INET;
   server_address.sin_addr = *((struct in_addr*)host->h_addr);
-  server_address.sin_port = req.GetPort();
+  server_address.sin_port = req->GetPort();
   socklen_t length = sizeof(server_address);
 
   // try connecting
-  if(connect(socket,(struct sockaddr*)&server_address, length)){
+  if(connect(server_socket,(struct sockaddr*)&server_address, length)){
     cout << "Unable to connect to the server!" << endl;
+    //delete [] req_buffer;
     //exit(EXIT_FAILURE);
   }
 
+  // try sending
+  if(send(server_socket, req_buffer, reqLen, 0) < 0){
+    cout << "Failed to send request to the server!" << endl;
+    //exit(EXIT_FAILURE);
+  }
+
+  delete [] req_buffer;
+
+  char* res_buffer = new char[2000]; // generous default response size 2KB
+  // right now non blocking code
+  int response_size = recv(server_socket, res_buffer, 2000, 0);
   
+  string response(res_buffer, response_size);
+
+  // free stuff
+  delete [] res_buffer;
+  close(server_socket);
+
+  return response;
 
 }
 
