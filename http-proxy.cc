@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <netdb.h>
 
 using namespace std;
 
@@ -28,7 +29,36 @@ string getRequest(int port);
 //convert the request into "relative URL + Host 
 //header" format (see the spec) before sending
 //it to the server.
-string getResponse(HttpRequest* req);
+string getResponse(HttpRequest* req){
+
+  // format the request
+  size_t reqLen = req.GetTotalLength();
+  char* request = new char[reqLen];
+  req.FormatRequest(request);
+
+  // get the server ip
+  string* hostname = req.GetHost(); // get the host name
+  struct hostent* host = gethostbyname(hostname->c_str()); // get host struct
+
+  // create the socket
+  int socket = socket(AF_INET, SOCK_STREAM, 0);
+
+  // create the address
+  struct sockaddr_in server_address;
+  server_address.sa_family = AF_INET;
+  server_address.sin_addr = *((struct in_addr*)host->h_addr);
+  server_address.sin_port = req.GetPort();
+  socklen_t length = sizeof(server_address);
+
+  // try connecting
+  if(connect(socket,(struct sockaddr*)&server_address, length)){
+    cout << "Unable to connect to the server!" << endl;
+    //exit(EXIT_FAILURE);
+  }
+
+  
+
+}
 
 
 
@@ -56,7 +86,6 @@ private:
 
 int main (int argc, char *argv[])
 {
-
   //create a new socket
   int listen_sock = socket(AF_INET, SOCK_STREAM, 0);
 
