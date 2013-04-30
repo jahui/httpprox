@@ -17,12 +17,13 @@ const int MAX_CONNECTIONS = 10;
 //TODO: for Sherri
 //uses recv() on the given port to obtain
 //the text of the request, returns a string
-//containing the request
+//containing the request. Should return when
+//the request is over (i.e. two '\r\n's in a row)
 string getRequest(int port);
 
 //TODO: for Jonathan
 //Given an HttpRequest object, contacts the
-//server and obtains the response in a string.
+//server and returns the response in a string.
 //This function should use req.FormatRequest() to
 //convert the request into "relative URL + Host 
 //header" format (see the spec) before sending
