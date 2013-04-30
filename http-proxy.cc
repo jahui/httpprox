@@ -7,11 +7,51 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <ctype.h>
 
 using namespace std;
 
 const int LISTEN_PORT = 14805;
 const int MAX_CONNECTIONS = 10;
+
+//TODO: for Sherri
+//uses recv() on the given port to obtain
+//the text of the request, returns a string
+//containing the request
+string getRequest(int port);
+
+//TODO: for Jonathan
+//Given an HttpRequest object, contacts the
+//server and obtains the response in a string.
+//This function should use req.FormatRequest() to
+//convert the request into "relative URL + Host 
+//header" format (see the spec) before sending
+//it to the server.
+string getResponse(HttpRequest* req);
+
+
+
+//TODO: for Jeremy
+class HttpProxyCache 
+{
+public:
+  HttpProxyCache();
+
+  //if the req exists in the cache and is not expired
+  //then return a pointer to the data, else return NULL
+  char* Query(HttpRequest* req);
+
+  //try to cache the response. Will not cache it
+  //if the object is not cacheable, (i.e. its private).
+  //This function should be thread safe.
+  bool AttemptAdd(HttpResponse* resp);
+
+private:
+  //some hash table here
+  //possibly a heap to manage expiration times
+};
+
+
 
 int main (int argc, char *argv[])
 {
@@ -74,12 +114,17 @@ int main (int argc, char *argv[])
           exit(EXIT_FAILURE);
         }
 
+
+      //TODO: For Sherri
+      //Look into using Pthreads or Boost threads instead of fork(), since
+      //fork() doesn't allow the child processes to share the cache.
+
       //fork a child to serve the peer
       if(fork() == 0)
         {
           //this is the child process
 
-          //child can stop listening
+          //child can stop listening for new connections
           close(listen_sock);
 
 
