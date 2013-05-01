@@ -10,14 +10,24 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <string>
+#include <cstring>
 #include <stdio.h>
+#include <pthread.h>
+#include <signal.h>
+#include <errno.h>
 #include "http-request.h"
+#include "http-response.h"
 
 using namespace std;
 
 const int LISTEN_PORT = 14805;
 const int MAX_CONNECTIONS = 10;
 const int BUFFER_SIZE = 512;
+
+pthread_mutex_t num_connections_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t num_connections_cond = PTHREAD_COND_INITIALIZER;
+
+int num_connections = 0;
 
 //TODO: for Sherri
 //uses recv() on the given port to obtain
@@ -118,8 +128,9 @@ public:
   HttpProxyCache();
 
   //if the req exists in the cache and is not expired
+  //then return the data string, else return "0"
   //then return a pointer to the data, else return NULL
-  char* Query(HttpRequest* req);
+  string Query(HttpRequest* req);
 
   //try to cache the response. Will not cache it
   //if the object is not cacheable, (i.e. its private).
@@ -131,6 +142,75 @@ private:
   //possibly a heap to manage expiration times
 };
 
+HttpProxyCache http_cache;
+
+void* servePeer(void* arg_sock)
+{
+  int peer_sock = *((int*) arg_sock);
+     
+  char buffer[BUFFER_SIZE]; // buffer
+  string request = ""; // request string
+  string req_to_be_parsed; // string ready to be parsed by HttpRequest
+  ssize_t recv_len; // recv return value
+  size_t end;
+  /* Loop forever:
+     recv() from peer, put result onto the end of buffer b. */
+  while(1)
+  {
+    recv_len = recv(peer_sock, buffer, BUFFER_SIZE, 0);
+    /*if recv() returns 0: (i.e. the connection has been closed)
+       subtract 1 from num_connections (it needs to do this thread safe)
+       thread should exit*/
+    if(0 == recv_len)
+    {
+      close(peer_sock);
+      pthread_mutex_lock(&num_connections_mutex);
+      num_connections--;
+      pthread_cond_signal(&num_connections_cond);
+      pthread_mutex_unlock(&num_connections_mutex);
+      pthread_exit(NULL);
+    }
+    else if(0 > recv_len)
+      perror("Error occurred in recv");
+    else
+      request.append(buffer, recv_len);
+
+    /*if newly recv()d stuff in b contains '\r\n\r\n' (two carriage returns in a row) then:
+      split b into two parts (before the '\r\n\r\n' and after the '\r\n\r\n'*/
+    if(std::string::npos != (end = request.find("\r\n\r\\n")))
+    {
+      req_to_be_parsed = request.substr(0, (end + 4));
+      // the second part becomes the new buffer b
+      request = request.substr((end + 4));
+      // the first part is parsed by HttpRequest,
+      HttpRequest req;
+      req.ParseRequest(req_to_be_parsed.c_str(), req_to_be_parsed.length() + 1);
+      // check the cache for the parsed url
+      string cached_data = http_cache.Query(&req);
+      // if it's in the cache
+      if(cached_data != "0")
+      {
+        // then send() the data to the user
+        send(peer_sock, &cached_data, sizeof(cached_data), 0);
+      } 
+      else
+      {
+        // the HttpRequest is given to the function getResponse()
+        string response = getResponse(&req);
+        // the result of the getResponse() is parsed by a HttpResponse()
+        HttpResponse resp;
+        resp.ParseResponse(response.c_str(), response.length() + 1);
+        // the HttpResponse is given to the cache to be added
+        http_cache.AttemptAdd(&resp);
+        // the HttpResponse is formatted and sent to the user using send()
+        size_t response_len = resp.GetTotalLength();
+        char formatted_response[response_len];
+        resp.FormatResponse(formatted_response);
+        send(peer_sock, formatted_response, response_len, 0);
+      }
+    }
+  }
+}
 
 
 int main (int argc, char *argv[])
@@ -161,23 +241,19 @@ int main (int argc, char *argv[])
     }
 
 
-  int num_connections = 0;
+  pthread_t threads[MAX_CONNECTIONS];
 
   //begin accepting connections
   while(true)
-    {
+  {
 
       // check if we have too many connections
       if(num_connections >= MAX_CONNECTIONS)
-        {
-          int status;
-
-          // loop until a child finishes
-          while(wait(&status) <= 0)
-            ;
-
-          num_connections--;
-        }
+      {
+        pthread_mutex_lock(&num_connections_mutex);
+        pthread_cond_wait(&num_connections_cond, &num_connections_mutex);
+        pthread_mutex_unlock(&num_connections_mutex);
+      }
 
       //accept the connection from the peer
       struct sockaddr_in peer_addr;
@@ -199,47 +275,21 @@ int main (int argc, char *argv[])
       //fork() doesn't allow the child processes to share the cache.
 
       //fork a child to serve the peer
-      if(fork() == 0)
-        {
-          //this is the child process
+      int i;
+      for(i = 0; i < MAX_CONNECTIONS; i++)
+      {
+        if(ESRCH == pthread_kill(threads[i], 0))
+          pthread_create(&threads[i], NULL, &servePeer, &peer_sock);
+      }
+      pthread_mutex_lock(&num_connections_mutex);
+      num_connections++;
+      pthread_mutex_unlock(&num_connections_mutex);
+  }
 
-          //child can stop listening for new connections
-          close(listen_sock);
-
-          /* Loop forever:
-               recv() from peer, put result onto the end of buffer b.
-
-               if recv() returns 0: (i.e. the connection has been closed)
-                 subtract 1 from num_connections (it needs to do this thread safe)
-                 thread should exit
-
-               if newly recv()d stuff in b contains '\r\n\r\n' (two carriage returns in a row) then:
-                 split b into two parts (before the '\r\n\r\n' and after the '\r\n\r\n':
-                 the first part is parsed by HttpRequest, 
-                 check the cache for the parsed url, 
-                 if it's in the cache, then send() the data to the user
-                 else:
-                   the HttpRequest is given to the function getResponse()
-                   the result of getResponse() is parsed by a HttpResponse()
-                   the HttpResponse is given to the cache to be added
-                   the HttpResponse is formatted and sent to the user using send()
-                 the second part becomes the new buffer b.
-          */
-
-          close(peer_sock);
-          exit(EXIT_SUCCESS);
-        }
-      else
-        {
-          //this is the parent process
-
-          num_connections++;
-
-          //parent doesn't need the peer connection
-          close(peer_sock);
-        }
-    }
-
+  // join all threads
+  int i;
+  for(i = 0; i < MAX_CONNECTIONS; i++)
+    pthread_join(threads[i], NULL);
 
   return 0;
 }
