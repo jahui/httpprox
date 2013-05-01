@@ -251,6 +251,7 @@ int main (int argc, char *argv[])
       if(num_connections >= MAX_CONNECTIONS)
       {
         pthread_mutex_lock(&num_connections_mutex);
+        // block until a thread signals (when it exits)
         pthread_cond_wait(&num_connections_cond, &num_connections_mutex);
         pthread_mutex_unlock(&num_connections_mutex);
       }
@@ -279,7 +280,10 @@ int main (int argc, char *argv[])
       for(i = 0; i < MAX_CONNECTIONS; i++)
       {
         if(ESRCH == pthread_kill(threads[i], 0))
+        {
           pthread_create(&threads[i], NULL, &servePeer, &peer_sock);
+          break;
+        }
       }
       pthread_mutex_lock(&num_connections_mutex);
       num_connections++;
