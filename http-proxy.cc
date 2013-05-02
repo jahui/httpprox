@@ -208,6 +208,11 @@ void HttpProxyCache::Query(PeerRequest* pr)
     {
       pr->stale = true;
     }
+  else
+    {
+      //the data is correct
+      pr->finished = true;
+    }
 
   //set the response to the cache data
   pr->resp.parseRequest(data->second.data);
