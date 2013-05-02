@@ -21,7 +21,7 @@ def configure (env):
     env.add_supported_cxxflags (cxxflags = ['-O0', '-g3', '-Wall', 
                                             '-Wno-unused-local-typedefs', '-Wno-unused-private-field', 
                                             '-fcolor-diagnostics', '-Qunused-arguments', 
-                                            '-Werror'])
+                                            '-Werror', '-std=c++11'])
 
 def build (env):
     env.load ('compiler_c compiler_cxx')

@@ -49,7 +49,7 @@ string getRequest(int port)
   {
     request.append(buffer, recv_len);
     //look for the end
-    if(std::string::npos != (end = request.find("\r\n\r\\n")))
+    if(std::string::npos != (end = request.find("\r\n\r\n")))
       break;
   }
   if(0 == recv_len)
@@ -60,64 +60,6 @@ string getRequest(int port)
   request = request.substr(0, (end + 4));
   
   return request;
-}
-
-
-//TODO: for Jonathan
-//Given an HttpRequest object, contacts the
-//server and returns the response in a string.
-//This function should use req.FormatRequest() to
-//convert the request into "relative URL + Host 
-//header" format (see the spec) before sending
-//it to the server.
-string getResponse(HttpRequest* req){
-
-  // format the request
-  size_t reqLen = req->GetTotalLength();
-  char* req_buffer = new char[reqLen];
-  req->FormatRequest(req_buffer);
-
-  // get the server ip
-  //const string hostname = req->GetHost(); // get the host name
-  struct hostent* host = gethostbyname((req->GetHost()).c_str()); // get host struct
-
-  // create the socket
-  int server_socket = socket(AF_INET, SOCK_STREAM, 0);
-
-  // create the address
-  struct sockaddr_in server_address;
-  server_address.sin_family = AF_INET;
-  server_address.sin_addr = *((struct in_addr*)host->h_addr);
-  server_address.sin_port = req->GetPort();
-  socklen_t length = sizeof(server_address);
-
-  // try connecting
-  if(connect(server_socket,(struct sockaddr*)&server_address, length)){
-    cout << "Unable to connect to the server!" << endl;
-    //delete [] req_buffer;
-    //exit(EXIT_FAILURE);
-  }
-
-  // try sending
-  if(send(server_socket, req_buffer, reqLen, 0) < 0){
-    cout << "Failed to send request to the server!" << endl;
-    //exit(EXIT_FAILURE);
-  }
-
-  delete [] req_buffer;
-
-  char* res_buffer = new char[2000]; // generous default response size 2KB
-  // right now non blocking code
-  int response_size = recv(server_socket, res_buffer, 2000, 0);
-  
-  string response(res_buffer, response_size);
-
-  // free stuff
-  delete [] res_buffer;
-  close(server_socket);
-
-  return response;
-
 }
 
 
@@ -138,11 +80,11 @@ struct PeerRequest {
   int server_socket;
   
   //this buffer holds the server response in its text form
-  char* server_buffer;
+  string server_buffer;
   int buffer_capacity;
   int buffer_num_chars;
 
-  bool stale; //true if the cache returned stale data
+  bool stale; //true if the cache returned a stale resp
 };
 
 PeerRequest::PeerRequest() {
@@ -150,13 +92,90 @@ PeerRequest::PeerRequest() {
   server_socket = -1;
   buffer_capacity = 100;
   buffer_num_chars = 0;
-  char* server_buffer = new char[buffer_capacity];
+  server_buffer = "";
   stale = false;
 }
 
-PeerRequest::~PeerRequest() {
-  delete server_buffer;
+
+
+//TODO: for Jonathan
+//Given an HttpRequest object, contacts the
+//server and returns the response in a string.
+//This function should use req.FormatRequest() to
+//convert the request into "relative URL + Host 
+//header" format (see the spec) before sending
+//it to the server.
+void getResponse(PeerRequest* node){
+
+  // format the request
+  size_t reqLen = node->req.GetTotalLength();
+  char* buffer = new char[reqLen];
+  node->req.FormatRequest(buffer);
+
+  // get the server ip
+  struct hostent* host = gethostbyname((node->req.GetHost()).c_str()); // get host struct
+
+  // create the socket
+  if(node->server_socket < 0){
+    node->server_socket = socket(AF_INET, SOCK_STREAM, 0);
+  }
+  // create the address
+  struct sockaddr_in server_address;
+  server_address.sin_family = AF_INET;
+  server_address.sin_addr = *((struct in_addr*)host->h_addr);
+  server_address.sin_port = node->req.GetPort();
+  socklen_t length = sizeof(server_address);
+  
+  // try connecting
+  if(connect(node->server_socket,(struct sockaddr*)&server_address, length)){
+    cout << "Unable to connect to the server!" << endl;
+    delete [] buffer;
+    return;
+    //exit(EXIT_FAILURE);
+  }
+
+  // try sending
+  if(send(node->server_socket, buffer, reqLen, 0) < 0){
+    cout << "Failed to send request to the server!" << endl;
+    delete [] buffer;
+    return;
+    //exit(EXIT_FAILURE);
+  }
+  
+  // done sending the request
+  delete [] buffer;
+
+  buffer = new char[BUFFER_SIZE];
+  
+  ssize_t recv_len;
+  size_t end;
+  while ( 0 < (recv_len = recv(node->server_socket, buffer, BUFFER_SIZE, MSG_DONTWAIT))){
+    
+    node->server_buffer.append(buffer, recv_len);
+    node->buffer_num_chars += recv_len;
+    //look for the end
+    if(std::string::npos != (end = node->server_buffer.find("\r\n\r\n")))
+      break;
+  }
+  // would have blocked
+  if (recv_len < 0)
+    return;
+  
+  // if value was stale before
+  if(node->stale){
+    HttpResponse check;
+    check.ParseResponse(node->server_buffer.c_str(), node->buffer_num_chars);
+    if(check.GetStatusCode() == "304"){
+      node->finished = true;
+      return;
+    }
+  }
+  // setting the response
+  node->resp.ParseResponse(node->server_buffer.c_str(), node->buffer_num_chars);
+  node->finished = true;
+  return;
 }
+
 
 //TODO: for Jeremy
 class HttpProxyCache 
@@ -213,7 +232,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
 
 
   //set the response to the cache data
-  pr->resp.parseRequest(data->second.data);
+  pr->resp.ParseResponse(data->second.data);
 
 
   //if the data is expired
@@ -238,7 +257,11 @@ void HttpProxyCache::Query(PeerRequest* pr)
 
 void HttpProxyCache::AttemptAdd(PeerRequest* pr)
 {
+<<<<<<< HEAD
   string expire_text = pr->resp.FindHeader("Expires");
+=======
+  string expire_text = resp->FindHeader("Expires");
+>>>>>>> 3cd7716adf457b1a7cbe21541e0d30093552f1fc
   struct tm time_struct;
   time_t time;
 
@@ -255,12 +278,21 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     }
 
   //create the cache key
+<<<<<<< HEAD
   string url = pr->req.getHost() + pr->req.getPath();
   
   //create the cache data
   int response_text_size = pr->resp.getTotalLength();
   char* response_text = new char[response_text_size];
   pr->resp.formatResponse(response_text);
+=======
+  string url = resp->GetHost() + resp->GetPath();
+  
+  //create the cache data
+  int response_text_size = resp->GetTotalLength();
+  char* response_text = new char[response_text_size];
+  resp->FormatResponse(response_text);
+>>>>>>> 3cd7716adf457b1a7cbe21541e0d30093552f1fc
   response_text[response_text_size] = '\0'; //terminate the string
   CacheData data(response_text, time);
 
@@ -318,7 +350,7 @@ void* servePeer(void* arg_sock)
 
     /*if newly recv()d stuff in b contains '\r\n\r\n' (two carriage returns in a row) then:
       split b into two parts (before the '\r\n\r\n' and after the '\r\n\r\n'*/
-    if(std::string::npos != (end = request.find("\r\n\r\\n")))
+    if(std::string::npos != (end = request.find("\r\n\r\n")))
     {
       req_to_be_parsed = request.substr(0, (end + 4));
       // the second part becomes the new buffer b
