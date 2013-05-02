@@ -387,7 +387,7 @@ void* servePeer(void* arg_sock)
       pthread_mutex_unlock(&num_connections_mutex);
       pthread_exit(NULL);
     }
-    else if(0 > recv_len)
+    else if(0 > recv_len && errno != EAGAIN && errno != EWOULDBLOCK)
       perror("Error occurred in recv");
     else
       request.append(buffer, recv_len);
