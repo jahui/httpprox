@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <errno.h>
+#include <ctime.h>
 #include "http-request.h"
 #include "http-response.h"
 
@@ -59,8 +60,7 @@ string getRequest(int port)
   
   return request;
 }
-    
-  
+
 
 //TODO: for Jonathan
 //Given an HttpRequest object, contacts the
@@ -120,6 +120,42 @@ string getResponse(HttpRequest* req){
 }
 
 
+struct PeerRequest {
+
+  PeerRequest();
+  ~PeerRequest();
+
+  //the request from the peer
+  HttpRequest req;
+
+  //the response to the peer
+  HttpResponse resp;
+
+  bool finished; //true if resp is ready to be sent to peer
+  
+  //the socket for the server
+  int server_socket;
+  
+  //this buffer holds the server response in its text form
+  char* server_buffer;
+  int buffer_capacity;
+  int buffer_num_chars;
+
+  bool stale; //true if the cache returned a stale resp
+};
+
+PeerRequest::PeerRequest() {
+  finished = false;
+  server_socket = -1;
+  buffer_capacity = 100;
+  buffer_num_chars = 0;
+  char* server_buffer = new char[buffer_capacity];
+  stale = false;
+}
+
+PeerRequest::~PeerRequest() {
+  delete server_buffer;
+}
 
 //TODO: for Jeremy
 class HttpProxyCache 
@@ -138,9 +174,65 @@ public:
   bool AttemptAdd(HttpResponse* resp);
 
 private:
-  //some hash table here
-  //possibly a heap to manage expiration times
+
+  struct CacheData {
+    string data;
+    time_t expireTime;
+  };
+  
+  unordered_map<string, CacheData> cache;
+
+  pthread_mutex_t mutex;
 };
+
+HttpProxyCache::HttpProxyCache() {
+  mutex = PTHREAD_MUTEX_INITIALIZER;
+}
+
+string HttpProxyCache::Query(PeerRequest* req) 
+{
+
+  string url = req.m_host + req.m_path;
+
+  //find the data
+  unordered_map<string, CacheData>::const_iterator data = cache.find(url);
+  
+  //if the data was not found, return NULL
+  if(data == cache.end())
+    {
+      return "";
+    } 
+
+  //if the data is expired, erase the data and return NULL
+  if(data->second.expireTime > time(NULL))
+    {
+      //obtain a lock
+      if(pthread_mutex_lock(&mutex))
+        {
+          cout << "Error locking cache mutex" << endl;
+          return "";
+        }
+
+      erase(data);
+
+      //release the lock
+      if(pthread_mutex_unlock(&mutex))
+        {
+          cout << "Error unlocking cache mutex" << endl;
+        }
+
+      return "";
+    }
+
+  return data->second.data;
+}
+
+bool HttpProxyCache::AttemptAdd(HttpResponse* resp)
+{
+  string expire_text = resp.FindHeader("Expires");
+  
+  return false;
+}
 
 HttpProxyCache http_cache;
 
