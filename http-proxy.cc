@@ -228,7 +228,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
 
 
   //set the response to the cache data
-  pr->resp.parseRequest(data->second.data);
+  pr->resp.ParseResponse(data->second.data);
 
 
   //if the data is expired
@@ -255,7 +255,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
 
 void HttpProxyCache::AttemptAdd(HttpResponse* resp)
 {
-  string expire_text = resp.FindHeader("Expires");
+  string expire_text = resp->FindHeader("Expires");
   struct tm time_struct;
   time_t time;
 
@@ -272,12 +272,12 @@ void HttpProxyCache::AttemptAdd(HttpResponse* resp)
     }
 
   //create the cache key
-  string url = resp.getHost() + resp.getPath();
+  string url = resp->GetHost() + resp->GetPath();
   
   //create the cache data
-  int response_text_size = resp.getTotalLength();
+  int response_text_size = resp->GetTotalLength();
   char* response_text = new char[response_text_size];
-  resp.formatResponse(response_text);
+  resp->FormatResponse(response_text);
   response_text[response_text_size] = '\0'; //terminate the string
   CacheData data(response_text, time);
 
