@@ -15,7 +15,8 @@
 #include <pthread.h>
 #include <signal.h>
 #include <errno.h>
-#include <ctime.h>
+#include <time.h>
+#include <unordered_map>
 #include "http-request.h"
 #include "http-response.h"
 
@@ -171,27 +172,30 @@ public:
   //try to cache the response. Will not cache it
   //if the object is not cacheable, (i.e. its private).
   //This function should be thread safe.
-  void AttemptAdd(HttpResponse* resp);
+  void AttemptAdd(PeerRequest* pr);
 
 private:
 
   struct CacheData {
 
-    CacheData(string data, time_t expireTime) 
+    CacheData(char* data, time_t expireTime) 
       : data(data), expireTime(expireTime) {}
 
     char* data;
     time_t expireTime;
   };
   
-  unordered_map<string, CacheData> cache;
+  map<string, CacheData> cache;
 
   pthread_mutex_t mutex;
 };
 
-HttpProxyCache::HttpProxyCache() {
-  mutex = PTHREAD_MUTEX_INITIALIZER;
+HttpProxyCache::HttpProxyCache() 
+{
+  //commented out for now due to compile errors.
+  //mutex = { PTHREAD_MUTEX_INITIALIZER }
 }
+
 
 void HttpProxyCache::Query(PeerRequest* pr) 
 {
@@ -230,13 +234,11 @@ void HttpProxyCache::Query(PeerRequest* pr)
       //the data is correct
       pr->finished = true;
     }
-
-
 }
 
-void HttpProxyCache::AttemptAdd(HttpResponse* resp)
+void HttpProxyCache::AttemptAdd(PeerRequest* pr)
 {
-  string expire_text = resp.FindHeader("Expires");
+  string expire_text = pr->resp.FindHeader("Expires");
   struct tm time_struct;
   time_t time;
 
@@ -253,12 +255,12 @@ void HttpProxyCache::AttemptAdd(HttpResponse* resp)
     }
 
   //create the cache key
-  string url = resp.getHost() + resp.getPath();
+  string url = pr->req.getHost() + pr->req.getPath();
   
   //create the cache data
-  int response_text_size = resp.getTotalLength();
+  int response_text_size = pr->resp.getTotalLength();
   char* response_text = new char[response_text_size];
-  resp.formatResponse(response_text);
+  pr->resp.formatResponse(response_text);
   response_text[response_text_size] = '\0'; //terminate the string
   CacheData data(response_text, time);
 
