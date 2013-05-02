@@ -153,7 +153,7 @@ void getResponse(PeerRequest* node){
     node->server_buffer.append(buffer, recv_len);
     node->buffer_num_chars += recv_len;
     //look for the end
-    if(std::string::npos != (end = node->server_buffer.find("\r\n\r\n")))
+    if(std::string::npos != (end = node->server_buffer.find("\r\n\r\\n")))
       break;
   }
   // would have blocked
