@@ -67,7 +67,6 @@ string getRequest(int port)
 struct PeerRequest {
 
   PeerRequest();
-  ~PeerRequest();
 
   //the request from the peer
   HttpRequest req;
@@ -213,7 +212,7 @@ private:
 
 HttpProxyCache::HttpProxyCache() 
 {
-  mutex = PTHREAD_MUTEX_INITIALIZER;
+  pthread_mutex_init(&mutex, NULL);
 }
 
 
