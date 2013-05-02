@@ -26,11 +26,14 @@ def configure (env):
 def build (env):
     env.load ('compiler_c compiler_cxx')
     env.load ('boost')
+    
+    ext_paths = ['/usr/lib/i386-linux-gnu', '/usr/lib/x86_64-linux-gnu']
+    env.read_shlib('pthread', paths = ext_paths)
 
     server = env.program (
         target = "http-proxy",
         features = ["cxx", "cxxprogram"],
-        use = 'BOOST BOOST_SYSTEM BOOST_THREAD',
+        use = 'BOOST BOOST_SYSTEM BOOST_THREAD pthread',
         source = [
             # Put additional files here
             # ...

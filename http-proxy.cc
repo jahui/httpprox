@@ -281,7 +281,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
   
   //create the cache data
   int response_text_size = pr->resp.GetTotalLength();
-  char* response_text = new char[response_text_size];
+  char* response_text = new char[response_text_size + 1];
   pr->resp.FormatResponse(response_text);
   response_text[response_text_size] = '\0'; //terminate the string
   CacheData data(response_text, response_text_size, time);
