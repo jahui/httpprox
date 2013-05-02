@@ -48,7 +48,7 @@ string getRequest(int port)
   {
     request.append(buffer, recv_len);
     //look for the end
-    if(std::string::npos != (end = request.find("\r\n\r\\n")))
+    if(std::string::npos != (end = request.find("\r\n\r\n")))
       break;
   }
   if(0 == recv_len)
@@ -153,7 +153,7 @@ void getResponse(PeerRequest* node){
     node->server_buffer.append(buffer, recv_len);
     node->buffer_num_chars += recv_len;
     //look for the end
-    if(std::string::npos != (end = node->server_buffer.find("\r\n\r\\n")))
+    if(std::string::npos != (end = node->server_buffer.find("\r\n\r\n")))
       break;
   }
   // would have blocked
@@ -335,7 +335,7 @@ void* servePeer(void* arg_sock)
 
     /*if newly recv()d stuff in b contains '\r\n\r\n' (two carriage returns in a row) then:
       split b into two parts (before the '\r\n\r\n' and after the '\r\n\r\n'*/
-    if(std::string::npos != (end = request.find("\r\n\r\\n")))
+    if(std::string::npos != (end = request.find("\r\n\r\n")))
     {
       req_to_be_parsed = request.substr(0, (end + 4));
       // the second part becomes the new buffer b
