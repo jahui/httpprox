@@ -93,23 +93,26 @@ string getResponse(HttpRequest* req){
   // try connecting
   if(connect(server_socket,(struct sockaddr*)&server_address, length)){
     cout << "Unable to connect to the server!" << endl;
-    //delete [] req_buffer;
+    delete [] req_buffer;
+    return NULL;
     //exit(EXIT_FAILURE);
   }
 
   // try sending
   if(send(server_socket, req_buffer, reqLen, 0) < 0){
     cout << "Failed to send request to the server!" << endl;
+    delete [] req_buffer;
+    return NULL;
     //exit(EXIT_FAILURE);
   }
 
   delete [] req_buffer;
 
   char* res_buffer = new char[2000]; // generous default response size 2KB
-  // right now non blocking code
+  // right now blocking code
   int response_size = recv(server_socket, res_buffer, 2000, 0);
   
-  string response(res_buffer, response_size);
+  string response(res_buffer, response_size); // create the return string
 
   // free stuff
   delete [] res_buffer;
