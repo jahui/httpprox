@@ -166,7 +166,7 @@ public:
   //if the req exists in the cache and is not expired
   //then return the data string, else return "0"
   //then return a pointer to the data, else return NULL
-  string Query(HttpRequest* req);
+  void Query(PeerRequest* pr);
 
   //try to cache the response. Will not cache it
   //if the object is not cacheable, (i.e. its private).
@@ -189,42 +189,28 @@ HttpProxyCache::HttpProxyCache() {
   mutex = PTHREAD_MUTEX_INITIALIZER;
 }
 
-string HttpProxyCache::Query(PeerRequest* req) 
+void HttpProxyCache::Query(PeerRequest* pr) 
 {
 
-  string url = req.m_host + req.m_path;
+  string url = pr->req.GetHost() + pr->req.GetPath();
 
   //find the data
   unordered_map<string, CacheData>::const_iterator data = cache.find(url);
   
-  //if the data was not found, return NULL
+  //if the data was not found then return
   if(data == cache.end())
     {
-      return "";
-    } 
-
-  //if the data is expired, erase the data and return NULL
-  if(data->second.expireTime > time(NULL))
-    {
-      //obtain a lock
-      if(pthread_mutex_lock(&mutex))
-        {
-          cout << "Error locking cache mutex" << endl;
-          return "";
-        }
-
-      erase(data);
-
-      //release the lock
-      if(pthread_mutex_unlock(&mutex))
-        {
-          cout << "Error unlocking cache mutex" << endl;
-        }
-
-      return "";
+      return;
     }
 
-  return data->second.data;
+  //if the data is expired, set stale flag
+  if(data->second.expireTime > time(NULL))
+    {
+      pr->stale = true;
+    }
+
+  //set the response to the cache data
+  pr->resp.parseRequest(data->second.data);
 }
 
 bool HttpProxyCache::AttemptAdd(HttpResponse* resp)
