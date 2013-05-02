@@ -440,6 +440,11 @@ int main (int argc, char *argv[])
 
 
   pthread_t threads[MAX_CONNECTIONS];
+  bool thread_ran[MAX_CONNECTIONS];
+
+  //no threads have been run yet
+  for(int i = 0; i < MAX_CONNECTIONS; i++)
+    thread_ran[i] = false;
 
   //begin accepting connections
   while(true)
@@ -477,11 +482,15 @@ int main (int argc, char *argv[])
       int i;
       for(i = 0; i < MAX_CONNECTIONS; i++)
       {
-        if(ESRCH == pthread_kill(threads[i], 0))
+        
+        //if the thread hasn't ran yet or if the thread has exited
+        if(!thread_ran[i] || ESRCH == pthread_kill(threads[i], 0))
         {
+          thread_ran[i] = true;
           pthread_create(&threads[i], NULL, &servePeer, &peer_sock);
           break;
         }
+
       }
       pthread_mutex_lock(&num_connections_mutex);
       num_connections++;
