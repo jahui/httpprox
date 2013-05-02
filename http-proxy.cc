@@ -141,7 +141,7 @@ struct PeerRequest {
   int buffer_capacity;
   int buffer_num_chars;
 
-  bool stale; //true if the cache returned a stale resp
+  bool stale; //true if the cache returned stale data
 };
 
 PeerRequest::PeerRequest() {
@@ -171,12 +171,16 @@ public:
   //try to cache the response. Will not cache it
   //if the object is not cacheable, (i.e. its private).
   //This function should be thread safe.
-  bool AttemptAdd(HttpResponse* resp);
+  void AttemptAdd(HttpResponse* resp);
 
 private:
 
   struct CacheData {
-    string data;
+
+    CacheData(string data, time_t expireTime) 
+      : data(data), expireTime(expireTime) {}
+
+    char* data;
     time_t expireTime;
   };
   
@@ -203,10 +207,23 @@ void HttpProxyCache::Query(PeerRequest* pr)
       return;
     }
 
-  //if the data is expired, set stale flag
+
+  //set the response to the cache data
+  pr->resp.parseRequest(data->second.data);
+
+
+  //if the data is expired
   if(data->second.expireTime > time(NULL))
     {
+
+      //the data is stale
       pr->stale = true;
+
+      //find the last time the page was modified
+      string lastModified = pr->resp.FindHeader("Last-Modified");
+
+      //set "If-Modified-Since" header in order to perform conditional GET
+      pr->req.ModifyHeader("If-Modified-Since", lastModified);
     }
   else
     {
@@ -214,15 +231,54 @@ void HttpProxyCache::Query(PeerRequest* pr)
       pr->finished = true;
     }
 
-  //set the response to the cache data
-  pr->resp.parseRequest(data->second.data);
+
 }
 
-bool HttpProxyCache::AttemptAdd(HttpResponse* resp)
+void HttpProxyCache::AttemptAdd(HttpResponse* resp)
 {
   string expire_text = resp.FindHeader("Expires");
+  struct tm time_struct;
+  time_t time;
+
+  // parse the expire text
+  if(strptime(expire_text, "%a, %d %b %Y %H:%M:%S GMT", &time_struct) == NULL)
+    {
+      cout << "Expires header is in incorrect format." << endl <<
+        "Assuming expired page." << endl;
+      time = 0;
+    }
+  else
+    {
+      time = mktime(&time_struct);
+    }
+
+  //create the cache key
+  string url = resp.getHost() + resp.getPath();
   
-  return false;
+  //create the cache data
+  int response_text_size = resp.getTotalLength();
+  char* response_text = new char[response_text_size];
+  resp.formatResponse(response_text);
+  response_text[response_text_size] = '\0'; //terminate the string
+  CacheData data(response_text, time);
+
+  //obtain a lock on the cache
+  if(pthread_mutex_lock(&mutex))
+    {
+      //report error but continue anyway and hope for the best
+      cout << "Error locking cache mutex" << endl;
+    }
+
+  //insert the key and data into the cache
+  cache.insert(url, data); 
+
+  //unlock the cache
+  if(pthread_mutex_unlock(&mutex))
+    {
+      cout << "Error unlocking cache mutex" << endl;
+    }
+
+  return;
 }
 
 HttpProxyCache http_cache;
