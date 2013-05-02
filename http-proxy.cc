@@ -16,7 +16,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 #include "http-request.h"
 #include "http-response.h"
 
@@ -197,22 +197,22 @@ private:
 
   struct CacheData {
 
-    CacheData(char* data, time_t expireTime) 
-      : data(data), expireTime(expireTime) {}
+    CacheData(char* data, int data_size, time_t expireTime) 
+      : data(data), data_size(data_size), expireTime(expireTime) {}
 
     char* data;
+    int data_size;
     time_t expireTime;
   };
   
-  map<string, CacheData> cache;
+  boost::unordered_map<string, CacheData> cache;
 
   pthread_mutex_t mutex;
 };
 
 HttpProxyCache::HttpProxyCache() 
 {
-  //commented out for now due to compile errors.
-  //mutex = { PTHREAD_MUTEX_INITIALIZER }
+  mutex = PTHREAD_MUTEX_INITIALIZER;
 }
 
 
@@ -222,7 +222,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
   string url = pr->req.GetHost() + pr->req.GetPath();
 
   //find the data
-  unordered_map<string, CacheData>::const_iterator data = cache.find(url);
+  boost::unordered_map<string, CacheData>::const_iterator data = cache.find(url);
   
   //if the data was not found then return
   if(data == cache.end())
@@ -232,7 +232,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
 
 
   //set the response to the cache data
-  pr->resp.ParseResponse(data->second.data);
+  pr->resp.ParseResponse(data->second.data, data->second.data_size);
 
 
   //if the data is expired
@@ -257,16 +257,14 @@ void HttpProxyCache::Query(PeerRequest* pr)
 
 void HttpProxyCache::AttemptAdd(PeerRequest* pr)
 {
-<<<<<<< HEAD
   string expire_text = pr->resp.FindHeader("Expires");
-=======
-  string expire_text = resp->FindHeader("Expires");
->>>>>>> 3cd7716adf457b1a7cbe21541e0d30093552f1fc
   struct tm time_struct;
   time_t time;
 
   // parse the expire text
-  if(strptime(expire_text, "%a, %d %b %Y %H:%M:%S GMT", &time_struct) == NULL)
+  if(strptime(expire_text.c_str(), 
+              "%a, %d %b %Y %H:%M:%S GMT", 
+              &time_struct) == NULL)
     {
       cout << "Expires header is in incorrect format." << endl <<
         "Assuming expired page." << endl;
@@ -278,23 +276,15 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     }
 
   //create the cache key
-<<<<<<< HEAD
-  string url = pr->req.getHost() + pr->req.getPath();
+
+  string url = pr->req.GetHost() + pr->req.GetPath();
   
   //create the cache data
-  int response_text_size = pr->resp.getTotalLength();
+  int response_text_size = pr->resp.GetTotalLength();
   char* response_text = new char[response_text_size];
-  pr->resp.formatResponse(response_text);
-=======
-  string url = resp->GetHost() + resp->GetPath();
-  
-  //create the cache data
-  int response_text_size = resp->GetTotalLength();
-  char* response_text = new char[response_text_size];
-  resp->FormatResponse(response_text);
->>>>>>> 3cd7716adf457b1a7cbe21541e0d30093552f1fc
+  pr->resp.FormatResponse(response_text);
   response_text[response_text_size] = '\0'; //terminate the string
-  CacheData data(response_text, time);
+  CacheData data(response_text, response_text_size, time);
 
   //obtain a lock on the cache
   if(pthread_mutex_lock(&mutex))
@@ -304,7 +294,8 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     }
 
   //insert the key and data into the cache
-  cache.insert(url, data); 
+  
+  cache.insert(pair<string, CacheData>(url, data));
 
   //unlock the cache
   if(pthread_mutex_unlock(&mutex))
