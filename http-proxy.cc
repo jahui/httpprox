@@ -169,17 +169,10 @@ void getResponse(PeerRequest* node){
       return;
     }
   }
-
-<<<<<<< HEAD
   // setting the response
   node->resp.ParseResponse(node->server_buffer.c_str(), node->buffer_num_chars);
   node->finished = true;
   return;
-=======
-  bool stale; //true if the cache returned stale data
-};
->>>>>>> origin/master
-
 }
 
 
