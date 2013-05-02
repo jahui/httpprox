@@ -170,10 +170,15 @@ void getResponse(PeerRequest* node){
     }
   }
 
+<<<<<<< HEAD
   // setting the response
   node->resp.ParseResponse(node->server_buffer.c_str(), node->buffer_num_chars);
   node->finished = true;
   return;
+=======
+  bool stale; //true if the cache returned stale data
+};
+>>>>>>> origin/master
 
 }
 
@@ -187,17 +192,21 @@ public:
   //if the req exists in the cache and is not expired
   //then return the data string, else return "0"
   //then return a pointer to the data, else return NULL
-  string Query(HttpRequest* req);
+  void Query(PeerRequest* pr);
 
   //try to cache the response. Will not cache it
   //if the object is not cacheable, (i.e. its private).
   //This function should be thread safe.
-  bool AttemptAdd(HttpResponse* resp);
+  void AttemptAdd(HttpResponse* resp);
 
 private:
 
   struct CacheData {
-    string data;
+
+    CacheData(string data, time_t expireTime) 
+      : data(data), expireTime(expireTime) {}
+
+    char* data;
     time_t expireTime;
   };
   
@@ -210,49 +219,92 @@ HttpProxyCache::HttpProxyCache() {
   mutex = PTHREAD_MUTEX_INITIALIZER;
 }
 
-string HttpProxyCache::Query(PeerRequest* req) 
+void HttpProxyCache::Query(PeerRequest* pr) 
 {
 
-  string url = req.m_host + req.m_path;
+  string url = pr->req.GetHost() + pr->req.GetPath();
 
   //find the data
   unordered_map<string, CacheData>::const_iterator data = cache.find(url);
   
-  //if the data was not found, return NULL
+  //if the data was not found then return
   if(data == cache.end())
     {
-      return "";
-    } 
-
-  //if the data is expired, erase the data and return NULL
-  if(data->second.expireTime > time(NULL))
-    {
-      //obtain a lock
-      if(pthread_mutex_lock(&mutex))
-        {
-          cout << "Error locking cache mutex" << endl;
-          return "";
-        }
-
-      erase(data);
-
-      //release the lock
-      if(pthread_mutex_unlock(&mutex))
-        {
-          cout << "Error unlocking cache mutex" << endl;
-        }
-
-      return "";
+      return;
     }
 
-  return data->second.data;
+
+  //set the response to the cache data
+  pr->resp.parseRequest(data->second.data);
+
+
+  //if the data is expired
+  if(data->second.expireTime > time(NULL))
+    {
+
+      //the data is stale
+      pr->stale = true;
+
+      //find the last time the page was modified
+      string lastModified = pr->resp.FindHeader("Last-Modified");
+
+      //set "If-Modified-Since" header in order to perform conditional GET
+      pr->req.ModifyHeader("If-Modified-Since", lastModified);
+    }
+  else
+    {
+      //the data is correct
+      pr->finished = true;
+    }
+
+
 }
 
-bool HttpProxyCache::AttemptAdd(HttpResponse* resp)
+void HttpProxyCache::AttemptAdd(HttpResponse* resp)
 {
   string expire_text = resp.FindHeader("Expires");
+  struct tm time_struct;
+  time_t time;
+
+  // parse the expire text
+  if(strptime(expire_text, "%a, %d %b %Y %H:%M:%S GMT", &time_struct) == NULL)
+    {
+      cout << "Expires header is in incorrect format." << endl <<
+        "Assuming expired page." << endl;
+      time = 0;
+    }
+  else
+    {
+      time = mktime(&time_struct);
+    }
+
+  //create the cache key
+  string url = resp.getHost() + resp.getPath();
   
-  return false;
+  //create the cache data
+  int response_text_size = resp.getTotalLength();
+  char* response_text = new char[response_text_size];
+  resp.formatResponse(response_text);
+  response_text[response_text_size] = '\0'; //terminate the string
+  CacheData data(response_text, time);
+
+  //obtain a lock on the cache
+  if(pthread_mutex_lock(&mutex))
+    {
+      //report error but continue anyway and hope for the best
+      cout << "Error locking cache mutex" << endl;
+    }
+
+  //insert the key and data into the cache
+  cache.insert(url, data); 
+
+  //unlock the cache
+  if(pthread_mutex_unlock(&mutex))
+    {
+      cout << "Error unlocking cache mutex" << endl;
+    }
+
+  return;
 }
 
 HttpProxyCache http_cache;
