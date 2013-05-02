@@ -1,6 +1,7 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 
 #include <iostream>
+#include <vector>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -311,22 +312,74 @@ HttpProxyCache http_cache;
 void* servePeer(void* arg_sock)
 {
   int peer_sock = *((int*) arg_sock);
-     
+ 
+  std::vector<struct PeerRequest> requests; // vector of PeerRequests
   char buffer[BUFFER_SIZE]; // buffer
   string request = ""; // request string
   string req_to_be_parsed; // string ready to be parsed by HttpRequest
   ssize_t recv_len; // recv return value
-  size_t end;
+  size_t end; // position of the end of a request
   /* Loop forever:
      recv() from peer, put result onto the end of buffer b. */
   while(1)
   {
-    recv_len = recv(peer_sock, buffer, BUFFER_SIZE, 0);
+    recv_len = recv(peer_sock, buffer, BUFFER_SIZE, MSG_DONTWAIT);
     /*if recv() returns 0: (i.e. the connection has been closed)
        subtract 1 from num_connections (it needs to do this thread safe)
        thread should exit*/
     if(0 == recv_len)
     {
+      // loop through the requests vector until all PeerRequests are done
+      while(0 != requests.size())
+      {
+        unsigned int k = 0;
+        // loop through the first ten
+        while(10 > k && requests.size() > k)
+        {
+          // check the cache for the parsed url
+          http_cache.Query(&requests[k]);
+          // if it's in the cache
+          if(requests[k].finished)
+          {
+            // make buffer to hold response
+            size_t response_len = requests[k].resp.GetTotalLength();
+            char formatted_response[response_len];
+            // format response
+            requests[k].resp.FormatResponse(formatted_response);
+            // send data to user
+            send(peer_sock, formatted_response, response_len, 0);
+            // remove the PeerRequest from the list
+            requests.erase(requests.begin() + k);
+            // do not imcrement k because one has just been removed
+          }  
+          // response is not done yet
+          else
+          {
+            // call getResponse on the PeerRequest
+            getResponse(&requests[k]);
+            // the response is now ready
+            if(requests[k].finished)
+            {
+              // make buffer to hold response
+              size_t response_len = requests[k].resp.GetTotalLength();
+              char formatted_response[response_len];
+              // format response
+              requests[k].resp.FormatResponse(formatted_response);
+              // send data to user
+              send(peer_sock, formatted_response, response_len, 0);
+              // remove the PeerRequest from the list
+              requests.erase(requests.begin() + k);
+              // do not imcrement k because one has just been removed
+            }
+            // the response is still not ready
+            else
+            {
+              // increment k to move on to the next PeerRequest
+              k++;
+            }
+          }
+        }
+      }
       close(peer_sock);
       pthread_mutex_lock(&num_connections_mutex);
       num_connections--;
@@ -349,29 +402,11 @@ void* servePeer(void* arg_sock)
       // the first part is parsed by HttpRequest,
       HttpRequest req;
       req.ParseRequest(req_to_be_parsed.c_str(), req_to_be_parsed.length() + 1);
-      // check the cache for the parsed url
-      string cached_data = http_cache.Query(&req);
-      // if it's in the cache
-      if(cached_data != "0")
-      {
-        // then send() the data to the user
-        send(peer_sock, &cached_data, sizeof(cached_data), 0);
-      } 
-      else
-      {
-        // the HttpRequest is given to the function getResponse()
-        string response = getResponse(&req);
-        // the result of the getResponse() is parsed by a HttpResponse()
-        HttpResponse resp;
-        resp.ParseResponse(response.c_str(), response.length() + 1);
-        // the HttpResponse is given to the cache to be added
-        http_cache.AttemptAdd(&resp);
-        // the HttpResponse is formatted and sent to the user using send()
-        size_t response_len = resp.GetTotalLength();
-        char formatted_response[response_len];
-        resp.FormatResponse(formatted_response);
-        send(peer_sock, formatted_response, response_len, 0);
-      }
+      // put HttpRequest into a PeerRequest
+      struct PeerRequest peer_req;
+      peer_req.req = req;
+      // put PeerRequest in requests vector
+      requests.push_back(peer_req);
     }
   }
 }
