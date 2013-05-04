@@ -122,6 +122,9 @@ void getResponse(PeerRequest* node)
   size_t end;
   string response;
 
+  //DEBUG
+  cout << "Entering recv loop, getResponse" << endl;
+
   // loop until we have a response
   while(string::npos == (end = response.find("\r\n\r\n")))
     {
@@ -134,6 +137,9 @@ void getResponse(PeerRequest* node)
         }
       
     }
+
+  //DEBUG
+  cout << "Leaving recv loop, getResponse" << endl;
 
   //split into content and header
   string content = response.substr(end + 4);
@@ -206,6 +212,7 @@ void getResponse(PeerRequest* node)
   cout << "Leaving getResponse" << endl;
   return;
 }
+
 
 
 class HttpProxyCache 
@@ -327,7 +334,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     {
       // we need to add an hour for some reason. DST?
       // Also need an extra 2 seconds to make the script work
-      expTime = mktime(&time_struct) - timezone + 2;
+      expTime = timegm(&time_struct) + 2/* - timezone + 2*/;
     }
 
  
