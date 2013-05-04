@@ -28,7 +28,7 @@
 
 using namespace std;
 
-const int LISTEN_PORT = 37654;
+const int LISTEN_PORT = 14805;
 const int MAX_CONNECTIONS = 20;
 const int BUFFER_SIZE = 512;
 
@@ -560,6 +560,7 @@ int main (int argc, char *argv[])
           num_threads = 0;
           for(int j = 0; j < MAX_CONNECTIONS; j++) 
             {
+              cout << "Waiting for all threads to finish" << endl;
               pthread_join(threads[j], NULL);
             }
         }   
