@@ -28,8 +28,8 @@
 
 using namespace std;
 
-const int LISTEN_PORT = 14835;
-const int MAX_CONNECTIONS = 50;
+const int LISTEN_PORT = 14805;
+const int MAX_CONNECTIONS = 10;
 const int BUFFER_SIZE = 512;
 
 
@@ -67,16 +67,16 @@ PeerRequest::PeerRequest() {
 
 
 
-//Given an HttpRequest object, contacts the
+//Given an PeerRequest object, contacts the
 //server and returns the response by modifying the
 //PeerRequest.
 void getResponse(PeerRequest* node)
 {
-
+  //DEBUG
+  cout << "Entering getResponse " << endl;
 
   // create the socket
   node->server_socket = socket(AF_INET, SOCK_STREAM, 0);
-
 
   //convert port to string
   stringstream ss;
@@ -95,7 +95,6 @@ void getResponse(PeerRequest* node)
   // connect to the server
   if(connect(node->server_socket,ai->ai_addr, ai->ai_addrlen))
     {
-      //TODO: try changing this to a return instead of exit
       cout << "Unable to connect to the server!" << endl;
       exit(1);
     }
@@ -127,8 +126,7 @@ void getResponse(PeerRequest* node)
   while(string::npos == (end = response.find("\r\n\r\n")))
     {
       recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, MSG_DONTWAIT);
-      cout << "test112" << endl;
-
+      //cout << recv_len << endl;
       if(recv_len > 0)
         {
           response.append(resp_buffer, recv_len);
@@ -149,13 +147,16 @@ void getResponse(PeerRequest* node)
     check.ParseResponse(response.c_str(), response.size());
 
     //check if the server sent response 304
-    if(check.GetStatusCode() == "304"){
-      cout << endl << "RECIEVED 304" << endl;
+    if(check.GetStatusCode() == "304")
+      {
 
-      //we are done with this node
-      node->finished = true;
-      return;
-    }
+        //we are done with this node
+        node->finished = true;
+        
+        //DEBUG
+        cout << "Recieved 304" << endl;
+        return;
+      }
   }
 
 
@@ -190,7 +191,7 @@ void getResponse(PeerRequest* node)
     {
       close(node->server_socket);
     }
-
+  cout << "Leaving getResponse" << endl;
   return;
 }
 
@@ -237,6 +238,8 @@ HttpProxyCache::HttpProxyCache()
 
 void HttpProxyCache::Query(PeerRequest* pr) 
 {
+  //DEBUG
+  cout << "Entering Query" << endl;
 
   string url = pr->req.GetHost() +  pr->req.GetPath();
 
@@ -246,6 +249,9 @@ void HttpProxyCache::Query(PeerRequest* pr)
   //if the data was not found then return
   if(data == cache.end())
     {
+      //DEBUG
+      cout << "Data was not found in the Query" << endl;
+
       return;
     }
 
@@ -253,10 +259,18 @@ void HttpProxyCache::Query(PeerRequest* pr)
   //set the response and content to the cache data
   pr->resp.ParseResponse(data->second.header, data->second.header_size);
   pr->content = data->second.content;
-  
+
+  time_t currTime = time(NULL);
+
+  //DEBUG
+  cout << "currTime " << currTime << endl;
+  cout << "expireTime " << data->second.expireTime << endl;
+
   //if the data is expired
-  if(data->second.expireTime < time(NULL))
+  if(data->second.expireTime < currTime)
     {
+      //DEBUG
+      cout << "Found stale data in the Query" << endl;
       //the data is stale
       pr->stale = true;
 
@@ -268,13 +282,21 @@ void HttpProxyCache::Query(PeerRequest* pr)
     }
   else
     {
+      //DEBUG
+      cout << "Found data in the Query" << endl;
+
       //the data is correct
       pr->finished = true;
     }
+
+
 }
 
 void HttpProxyCache::AttemptAdd(PeerRequest* pr)
 {
+  //DEBUG
+  cout << "Entering AttemptAdd" << endl;
+
   string expire_text = pr->resp.FindHeader("Expires");
   struct tm time_struct;
   time_t expTime;
@@ -291,19 +313,33 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     }
   else
     {
-      // we need to add an hour for some reason, DST?
-      expTime = mktime(&time_struct) - timezone + 3600;
+      // we need to add an hour for some reason. DST?
+      // Also need an extra 2 seconds to make the script work
+      expTime = mktime(&time_struct) - timezone + 3602;
     }
+
+ 
+  
 
   //create the cache key
   string url = pr->req.GetHost() + pr->req.GetPath();
 
   boost::unordered_map<string, CacheData>::const_iterator existingData = cache.find(url);
 
+  //DEBUG
+  if(existingData != cache.end())
+    {
+      cout << "expTime" << endl;
+      cout << "existingExpTime" << endl;
+    }
+
+
+
   // if the data is not in the cache or it is fresher than what's in the cache
   if(existingData == cache.end() || existingData->second.expireTime < expTime)
-    {
-  
+    {  
+
+
       //create the cache data
       int response_text_size = pr->resp.GetTotalLength();
       char* response_text = new char[response_text_size + 1];
@@ -319,18 +355,17 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
         }
 
       //insert the key and data into the cache
-      cout<< "url: " << url << endl;
       cache.insert(pair<string, CacheData>(url, data));
-      cout <<  "test111" << endl;
-  
 
       //unlock the cache
       if(pthread_mutex_unlock(&mutex))
         {
           cout << "Error unlocking cache mutex" << endl;
         }
-      cout << "test115"<< endl;
     }
+  //DEBUG
+  cout << "Leaving attemptAdd" << endl;
+
   return;
 }
 
@@ -348,7 +383,7 @@ void* servePeer(void* arg_sock)
   
   peer_req.peer_socket = peer_sock; 
 
-  //loop that takes many requests from a peer
+  //loop through multiple requests
   while(1)
     {
     request = "";
@@ -359,10 +394,11 @@ void* servePeer(void* arg_sock)
         recv_len = recv(peer_sock, buffer, BUFFER_SIZE, MSG_DONTWAIT);
     
         //if the connection is closed then exit
-        if(recv_len == 0) {
-          close(peer_sock);
-          pthread_exit(NULL);
-        }
+        if(recv_len == 0) 
+          {
+            close(peer_sock);
+            pthread_exit(NULL);
+          }
         //if there is an error, output error and exit
         else if(0 > recv_len && errno != EAGAIN && errno != EWOULDBLOCK)
           {
@@ -436,10 +472,7 @@ void* servePeer(void* arg_sock)
         close(peer_sock);
         pthread_exit(NULL);
       }
-      
-
-     
-  }
+    }
 }
 
 
