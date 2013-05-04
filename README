@@ -30,3 +30,17 @@ If there are any errors, please email me.
 
 build/http-proxy
 
+Code Description
+================
+The program will listen for peers and create a thread to handle each thread's requests using servePeer function.
+servePeer will receive the requests one at a time and query the cache for response.
+If cache has the response and it's not expired, the PeerRequest will be "finished" meaning the response is ready to be sent. Else servePeer will call getResponse function to get the response.
+servePeer will then format the response and call AttemptAdd to the cache.
+Finally, servePeer will send the response to the peer.
+
+
+Design Decisions
+=================
+- whenever the program runs into some error, such as an unconnectable peer, the program will exit for simplicity
+- use of a struct to contain each peer request
+

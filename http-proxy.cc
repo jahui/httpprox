@@ -568,6 +568,7 @@ int main (int argc, char *argv[])
           num_threads = 0;
           for(int j = 0; j < MAX_CONNECTIONS; j++) 
             {
+              cout << "Waiting for all threads to finish" << endl;
               pthread_join(threads[j], NULL);
             }
         }   
