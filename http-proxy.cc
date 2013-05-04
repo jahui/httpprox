@@ -163,22 +163,27 @@ void getResponse(PeerRequest* node)
   //obtain the content length
   HttpResponse parser;
   parser.ParseResponse(response.c_str(), response.size());
-  string cont_length_str = parser.FindHeader("Content-Length");
+  string cont_length_str = parser.FindHeader("Content-length");
   unsigned int cont_length = 0;
 
   if(cont_length_str.size() != 0)
     cont_length = atoi(cont_length_str.c_str());
   
  
+  //DEBUG
+  cout << "Length of content from header " << cont_length << endl;
   
   //block until we finish reading the content
   while(content.size() < cont_length)
     {
-      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, MSG_DONTWAIT);
+      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
       if(recv_len > 0)
         content.append(resp_buffer, recv_len);
     }
-      
+  
+  //DEBUG
+  cout << "Length of actual content " << content.size() << endl;  
+
   // parse the response
   node->resp.ParseResponse(response.c_str(), response.size());
 
@@ -315,7 +320,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     {
       // we need to add an hour for some reason. DST?
       // Also need an extra 2 seconds to make the script work
-      expTime = mktime(&time_struct) - timezone + 3600;
+      expTime = mktime(&time_struct) - timezone;
     }
 
  
@@ -416,6 +421,10 @@ void* servePeer(void* arg_sock)
           }
       }
     
+    //DEBUG
+	cout << "Raw request: " << request << endl;
+
+
     // split the request into two parts, the full request to be parsed
     // and whatever is left over
     req_to_be_parsed = request.substr(0, (end + 4));
