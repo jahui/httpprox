@@ -28,8 +28,8 @@
 
 using namespace std;
 
-const int LISTEN_PORT = 14805;
-const int MAX_CONNECTIONS = 10;
+const int LISTEN_PORT = 37621;
+const int MAX_CONNECTIONS = 20;
 const int BUFFER_SIZE = 512;
 
 
@@ -125,7 +125,7 @@ void getResponse(PeerRequest* node)
   // loop until we have a response
   while(string::npos == (end = response.find("\r\n\r\n")))
     {
-      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, MSG_DONTWAIT);
+      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
       //cout << recv_len << endl;
       if(recv_len > 0)
         {
@@ -315,7 +315,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     {
       // we need to add an hour for some reason. DST?
       // Also need an extra 2 seconds to make the script work
-      expTime = mktime(&time_struct) - timezone + 3602;
+      expTime = mktime(&time_struct) - timezone + 3600;
     }
 
  
@@ -391,7 +391,7 @@ void* servePeer(void* arg_sock)
     while(std::string::npos == (end = request.find("\r\n\r\n")))
       {
 
-        recv_len = recv(peer_sock, buffer, BUFFER_SIZE, MSG_DONTWAIT);
+        recv_len = recv(peer_sock, buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
     
         //if the connection is closed then exit
         if(recv_len == 0) 
