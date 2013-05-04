@@ -168,6 +168,13 @@ void getResponse(PeerRequest* node)
 
   if(cont_length_str.size() != 0)
     cont_length = atoi(cont_length_str.c_str());
+
+  if(cont_length == 0)
+    {
+      cont_length_str = parser.FindHeader("Content-Length");
+      if(cont_length_str.size() != 0)
+        cont_length = atoi(cont_length_str.c_str());
+    }
   
  
   //DEBUG
@@ -320,7 +327,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     {
       // we need to add an hour for some reason. DST?
       // Also need an extra 2 seconds to make the script work
-      expTime = mktime(&time_struct) - timezone;
+      expTime = mktime(&time_struct) - timezone + 2;
     }
 
  
