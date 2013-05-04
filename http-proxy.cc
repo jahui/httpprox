@@ -307,7 +307,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
 void HttpProxyCache::AttemptAdd(PeerRequest* pr)
 {
   //DEBUG
-  cout << "Entering AttemptAdd" << endl;
+  cout << endl << "Entering AttemptAdd" << endl;
 
   string expire_text = pr->resp.FindHeader("Expires");
   struct tm time_struct;
@@ -341,7 +341,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
   //DEBUG
   if(existingData != cache.end())
     {
-      cout << "expTime" << endl;
+      cout << "expTime: " << expTime << endl;
       cout << "existingExpTime" << endl;
     }
 
@@ -350,7 +350,8 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
   // if the data is not in the cache or it is fresher than what's in the cache
   if(existingData == cache.end() || existingData->second.expireTime < expTime)
     {  
-
+      //DEBUG
+      cout << "Creating Cache Data" << endl;
 
       //create the cache data
       int response_text_size = pr->resp.GetTotalLength();
@@ -464,6 +465,7 @@ void* servePeer(void* arg_sock)
     
     // output the final response for debugging
     string ffr = formatted_response;
+    cout << endl;
     cout << "Final formatted response:" << endl << ffr << endl;
     cout << "Final content: " << endl << peer_req.content << endl;
 
@@ -489,6 +491,8 @@ void* servePeer(void* arg_sock)
         pthread_exit(NULL);
       }
     }
+  
+  cout << "End of serve peer" << endl;
 }
 
 

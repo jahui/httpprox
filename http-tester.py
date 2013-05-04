@@ -4,7 +4,7 @@ from threading import Thread
 from httplib import HTTPConnection
 from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
 from datetime import datetime, timedelta
-from bcolor import bcolors
+#from bcolor import bcolors
 import sys
 import time
 
@@ -156,17 +156,17 @@ client1 = ClientThread("127.0.0.1:" + pport, "http://127.0.0.1:" + sport1 + "/ba
 client1.start()
 client1.join()
 if client1.result:
-    print "Basic object fetching: [" + bcolors.PASS + "PASSED" + bcolors.ENDC + "]" 
+    print "Basic object fetching: [PASSED]" 
 else: 
-    print "Basic object fetching: [" + bcolors.FAIL + "FAILED" + bcolors.ENDC + "]" 
+    print "Basic object fetching: [FAILED]" 
 
 client2 = ClientPersistThread("127.0.0.1:" + pport, "http://127.0.0.1:" + sport1 + "/basic", "./basic", "http://127.0.0.1:" + sport1 + "/basic2", "./basic2")
 client2.start()
 client2.join()
 if client2.result:
-    print "Persistent Connection: [" + bcolors.PASS + "PASSED" + bcolors.ENDC + "]"
+    print "Persistent Connection: [PASSED]"
 else:
-    print "Persistent Connection: [" + bcolors.FAIL + "FAILED" + bcolors.ENDC + "]"
+    print "Persistent Connection: [FAILED]"
 
 client3 = ClientThread("127.0.0.1:" + pport, "http://127.0.0.1:"+ sport1 +"/basic3", "./basic3")
 client4 = ClientThread("127.0.0.1:" + pport, "http://127.0.0.1:"+ sport2 +"/basic3", "./basic3")
@@ -185,9 +185,9 @@ cdata = datafile.read()
 if(end - start) < 4 and client3.data == cdata and client4.data == cdata:
     r = True
 if r:
-    print "Concurrent Connection: [" + bcolors.PASS + "PASSED" + bcolors.ENDC + "]"
+    print "Concurrent Connection: [PASSED]"
 else:
-    print "Concurrent Connection: [" + bcolors.FAIL + "FAILED" + bcolors.ENDC + "]"
+    print "Concurrent Connection: [FAILED]"
 
 client5 = ClientThread("127.0.0.1:" + pport, "http://127.0.0.1:"+sport1+"/cacheTest", "./basic")
 client5.start()
@@ -200,9 +200,9 @@ r = False
 if client5.data == client6.data and client5.data != "":
     r = True
 if r:
-    print "Caching: [" + bcolors.PASS + "PASSED" + bcolors.ENDC + "]"
+    print "Caching: [PASSED]"
 else:
-    print "Caching: [" + bcolors.FAIL + "FAILED" + bcolors.ENDC + "]"
+    print "Caching: [FAILED]"
 
 server1.server.shutdown()
 server2.server.shutdown()

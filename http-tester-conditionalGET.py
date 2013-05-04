@@ -4,7 +4,7 @@ from threading import Thread
 from httplib import HTTPConnection
 from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
 from datetime import datetime, timedelta
-from bcolor import bcolors
+#from bcolor import bcolors
 import sys
 import time
 import re, socket, calendar
@@ -144,9 +144,9 @@ try:
     if data4 == "OK" and data3 == cdata and data2 == cdata:
         r = True
     if r:
-        print "Re-query Caching: [" + bcolors.PASS + "PASSED" + bcolors.ENDC + "]"
+        print "Re-query Caching: [PASSED]"
     else:
-        print "Re-query Caching: [" + bcolors.FAIL + "FAILED" + bcolors.ENDC + "]"
+        print "Re-query Caching: [FAILED]"
 except:
     server1.server.shutdown()
 
