@@ -91,16 +91,20 @@ try:
     server1.start()
     dataFile = open('basic', "r")
     cdata = dataFile.read()
+
     print "cdata"
     print cdata
+
     r = False
     proxy = '127.0.0.1:'+pport
     conn = HTTPConnection(proxy)
     conn.request("GET", "http://127.0.0.1:" + sport1 + "/basic")
     resp = conn.getresponse()
     data = resp.read()
+
     print "data1"
     print data
+
     conn.close()
 
     time.sleep(3)
@@ -108,8 +112,10 @@ try:
     conn2.request("GET", "http://127.0.0.1:" + sport1 + "/basic")
     resp2 = conn2.getresponse()
     data2 = resp2.read()
+
     print "data2"
     print data2
+
     conn2.close()
 
     time.sleep(3)
@@ -117,8 +123,10 @@ try:
     conn3.request("GET", "http://127.0.0.1:" + sport1 + "/basic")
     resp3 = conn3.getresponse()
     data3 = resp3.read()
+
     print "data3"
     print data3
+
     conn3.close()
 
     time.sleep(6)
@@ -126,8 +134,10 @@ try:
     conn4.request("GET", "http://127.0.0.1:" + sport1 + "/basic")
     resp4 = conn4.getresponse()
     data4 = resp4.read()
+
     print "data4"
     print data4
+
     conn4.close()
 
 
