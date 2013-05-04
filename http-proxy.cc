@@ -28,7 +28,7 @@
 
 using namespace std;
 
-const int LISTEN_PORT = 37621;
+const int LISTEN_PORT = 37654;
 const int MAX_CONNECTIONS = 20;
 const int BUFFER_SIZE = 512;
 
@@ -122,10 +122,13 @@ void getResponse(PeerRequest* node)
   size_t end;
   string response;
 
+  //DEBUG
+  cout << "Entering recv loop, getResponse" << endl;
+
   // loop until we have a response
   while(string::npos == (end = response.find("\r\n\r\n")))
     {
-      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
+      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, MSG_DONTWAIT);
       //cout << recv_len << endl;
       if(recv_len > 0)
         {
@@ -134,6 +137,9 @@ void getResponse(PeerRequest* node)
         }
       
     }
+
+  //DEBUG
+  cout << "Leaving recv loop, getResponse" << endl;
 
   //split into content and header
   string content = response.substr(end + 4);
@@ -183,7 +189,7 @@ void getResponse(PeerRequest* node)
   //block until we finish reading the content
   while(content.size() < cont_length)
     {
-      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
+      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, MSG_DONTWAIT);
       if(recv_len > 0)
         content.append(resp_buffer, recv_len);
     }
@@ -206,6 +212,7 @@ void getResponse(PeerRequest* node)
   cout << "Leaving getResponse" << endl;
   return;
 }
+
 
 
 class HttpProxyCache 
@@ -327,7 +334,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
     {
       // we need to add an hour for some reason. DST?
       // Also need an extra 2 seconds to make the script work
-      expTime = mktime(&time_struct) - timezone + 2;
+      expTime = timegm(&time_struct) + 2/* - timezone + 2*/;
     }
 
  
@@ -399,12 +406,15 @@ void* servePeer(void* arg_sock)
   //loop through multiple requests
   while(1)
     {
-    request = "";
+
+	//DEBUT
+	cout << "Entering recv loop" << endl;
+
     //loop until we get a full request
     while(std::string::npos == (end = request.find("\r\n\r\n")))
       {
 
-        recv_len = recv(peer_sock, buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
+        recv_len = recv(peer_sock, buffer, BUFFER_SIZE, MSG_DONTWAIT);
     
         //if the connection is closed then exit
         if(recv_len == 0) 
@@ -428,8 +438,11 @@ void* servePeer(void* arg_sock)
             request.append(buffer, recv_len); 
           }
       }
+
+
     
     //DEBUG
+	cout << "Leaving recv loop" << endl;
 	cout << "Raw request: " << request << endl;
 
 
