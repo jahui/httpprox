@@ -28,7 +28,7 @@
 
 using namespace std;
 
-const int LISTEN_PORT = 37621;
+const int LISTEN_PORT = 37654;
 const int MAX_CONNECTIONS = 20;
 const int BUFFER_SIZE = 512;
 
@@ -125,7 +125,7 @@ void getResponse(PeerRequest* node)
   // loop until we have a response
   while(string::npos == (end = response.find("\r\n\r\n")))
     {
-      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
+      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, MSG_DONTWAIT);
       //cout << recv_len << endl;
       if(recv_len > 0)
         {
@@ -183,7 +183,7 @@ void getResponse(PeerRequest* node)
   //block until we finish reading the content
   while(content.size() < cont_length)
     {
-      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
+      recv_len = recv(node->server_socket, resp_buffer, BUFFER_SIZE, MSG_DONTWAIT);
       if(recv_len > 0)
         content.append(resp_buffer, recv_len);
     }
@@ -398,12 +398,15 @@ void* servePeer(void* arg_sock)
   //loop through multiple requests
   while(1)
     {
-    request = "";
+
+	//DEBUT
+	cout << "Entering recv loop" << endl;
+
     //loop until we get a full request
     while(std::string::npos == (end = request.find("\r\n\r\n")))
       {
 
-        recv_len = recv(peer_sock, buffer, BUFFER_SIZE, 0 /*MSG_DONTWAIT*/);
+        recv_len = recv(peer_sock, buffer, BUFFER_SIZE, MSG_DONTWAIT);
     
         //if the connection is closed then exit
         if(recv_len == 0) 
@@ -427,8 +430,11 @@ void* servePeer(void* arg_sock)
             request.append(buffer, recv_len); 
           }
       }
+
+
     
     //DEBUG
+	cout << "Leaving recv loop" << endl;
 	cout << "Raw request: " << request << endl;
 
 
