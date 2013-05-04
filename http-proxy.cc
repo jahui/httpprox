@@ -28,7 +28,7 @@
 
 using namespace std;
 
-const int LISTEN_PORT = 37654;
+const int LISTEN_PORT = 14805;
 const int MAX_CONNECTIONS = 20;
 const int BUFFER_SIZE = 512;
 
@@ -73,7 +73,7 @@ PeerRequest::PeerRequest() {
 void getResponse(PeerRequest* node)
 {
   //DEBUG
-  cout << "Entering getResponse " << endl;
+  //cout << "Entering getResponse " << endl;
 
   // create the socket
   node->server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -123,7 +123,7 @@ void getResponse(PeerRequest* node)
   string response;
 
   //DEBUG
-  cout << "Entering recv loop, getResponse" << endl;
+  //cout << "Entering recv loop, getResponse" << endl;
 
   // loop until we have a response
   while(string::npos == (end = response.find("\r\n\r\n")))
@@ -139,7 +139,7 @@ void getResponse(PeerRequest* node)
     }
 
   //DEBUG
-  cout << "Leaving recv loop, getResponse" << endl;
+  //cout << "Leaving recv loop, getResponse" << endl;
 
   //split into content and header
   string content = response.substr(end + 4);
@@ -160,7 +160,7 @@ void getResponse(PeerRequest* node)
         node->finished = true;
         
         //DEBUG
-        cout << "Recieved 304" << endl;
+        //cout << "Recieved 304" << endl;
         return;
       }
   }
@@ -184,7 +184,7 @@ void getResponse(PeerRequest* node)
   
  
   //DEBUG
-  cout << "Length of content from header " << cont_length << endl;
+  //cout << "Length of content from header " << cont_length << endl;
   
   //block until we finish reading the content
   while(content.size() < cont_length)
@@ -195,7 +195,7 @@ void getResponse(PeerRequest* node)
     }
   
   //DEBUG
-  cout << "Length of actual content " << content.size() << endl;  
+  //cout << "Length of actual content " << content.size() << endl;  
 
   // parse the response
   node->resp.ParseResponse(response.c_str(), response.size());
@@ -209,7 +209,7 @@ void getResponse(PeerRequest* node)
     {
       close(node->server_socket);
     }
-  cout << "Leaving getResponse" << endl;
+  //cout << "Leaving getResponse" << endl;
   return;
 }
 
@@ -258,7 +258,7 @@ HttpProxyCache::HttpProxyCache()
 void HttpProxyCache::Query(PeerRequest* pr) 
 {
   //DEBUG
-  cout << "Entering Query" << endl;
+  //cout << "Entering Query" << endl;
 
   string url = pr->req.GetHost() +  pr->req.GetPath();
 
@@ -269,7 +269,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
   if(data == cache.end())
     {
       //DEBUG
-      cout << "Data was not found in the Query" << endl;
+      //cout << "Data was not found in the Query" << endl;
 
       return;
     }
@@ -282,14 +282,14 @@ void HttpProxyCache::Query(PeerRequest* pr)
   time_t currTime = time(NULL);
 
   //DEBUG
-  cout << "currTime " << currTime << endl;
-  cout << "expireTime " << data->second.expireTime << endl;
+  //cout << "currTime " << currTime << endl;
+  //cout << "expireTime " << data->second.expireTime << endl;
 
   //if the data is expired
   if(data->second.expireTime < currTime)
     {
       //DEBUG
-      cout << "Found stale data in the Query" << endl;
+      //cout << "Found stale data in the Query" << endl;
       //the data is stale
       pr->stale = true;
 
@@ -302,7 +302,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
   else
     {
       //DEBUG
-      cout << "Found data in the Query" << endl;
+      //cout << "Found data in the Query" << endl;
 
       //the data is correct
       pr->finished = true;
@@ -314,7 +314,7 @@ void HttpProxyCache::Query(PeerRequest* pr)
 void HttpProxyCache::AttemptAdd(PeerRequest* pr)
 {
   //DEBUG
-  cout << endl << "Entering AttemptAdd" << endl;
+  //cout << endl << "Entering AttemptAdd" << endl;
 
   string expire_text = pr->resp.FindHeader("Expires");
   struct tm time_struct;
@@ -346,19 +346,20 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
   boost::unordered_map<string, CacheData>::const_iterator existingData = cache.find(url);
 
   //DEBUG
+  /*
   if(existingData != cache.end())
     {
       cout << "expTime: " << expTime << endl;
       cout << "existingExpTime" << endl;
     }
-
+  */
 
 
   // if the data is not in the cache or it is fresher than what's in the cache
   if(existingData == cache.end() || existingData->second.expireTime < expTime)
     {  
       //DEBUG
-      cout << "Creating Cache Data" << endl;
+      //cout << "Creating Cache Data" << endl;
 
       //create the cache data
       int response_text_size = pr->resp.GetTotalLength();
@@ -384,7 +385,7 @@ void HttpProxyCache::AttemptAdd(PeerRequest* pr)
         }
     }
   //DEBUG
-  cout << "Leaving attemptAdd" << endl;
+  //cout << "Leaving attemptAdd" << endl;
 
   return;
 }
@@ -408,14 +409,15 @@ void* servePeer(void* arg_sock)
     {
 
 	//DEBUT
-	cout << "Entering recv loop" << endl;
+	//cout << "Entering recv loop" << endl;
 
     //loop until we get a full request
     while(std::string::npos == (end = request.find("\r\n\r\n")))
       {
 
+        
         recv_len = recv(peer_sock, buffer, BUFFER_SIZE, MSG_DONTWAIT);
-    
+        
         //if the connection is closed then exit
         if(recv_len == 0) 
           {
@@ -435,6 +437,8 @@ void* servePeer(void* arg_sock)
         //if we recieve some bytes, append them to the request buffer
         else if(recv_len > 0)
           {
+            //DEBUG
+            //cout << "Adding to request" << endl;
             request.append(buffer, recv_len); 
           }
       }
@@ -442,8 +446,8 @@ void* servePeer(void* arg_sock)
 
     
     //DEBUG
-	cout << "Leaving recv loop" << endl;
-	cout << "Raw request: " << request << endl;
+    //cout << "Leaving recv loop" << endl;
+	//cout << "Raw request: " << request << endl;
 
 
     // split the request into two parts, the full request to be parsed
@@ -477,10 +481,10 @@ void* servePeer(void* arg_sock)
     formatted_response[response_len] = '\0';
     
     // output the final response for debugging
-    string ffr = formatted_response;
-    cout << endl;
-    cout << "Final formatted response:" << endl << ffr << endl;
-    cout << "Final content: " << endl << peer_req.content << endl;
+    //string ffr = formatted_response;
+    //cout << endl;
+    //cout << "Final formatted response:" << endl << ffr << endl;
+    //cout << "Final content: " << endl << peer_req.content << endl;
 
     // add the response to the cache
     http_cache.AttemptAdd(&peer_req);
@@ -499,13 +503,13 @@ void* servePeer(void* arg_sock)
     // if the peer set the request to "close" then close
     if(peer_req.req.FindHeader("Connection").compare("close") == 0)
       {
-        cout << "closing thread" << endl;
+        //cout << "closing thread" << endl;
         close(peer_sock);
         pthread_exit(NULL);
       }
     }
   
-  cout << "End of serve peer" << endl;
+  //cout << "End of serve peer" << endl;
 }
 
 
